@@ -1,15 +1,38 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Movies.Client.Services; 
+using Movies.Client;
+using Movies.Client.Helpers;
+using Movies.Client.Services;
 
 using IHost host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((_, services) =>
-    { 
+    {
         // register services for DI
         services.AddLogging(configure => configure.AddDebug().AddConsole());
 
-        services.AddHttpClient();
+        services.AddSingleton<JsonSerializerOptionsWrapper>();
+
+        services
+            .AddHttpClient(
+                "MoviesAPIClient",
+                configureClient =>
+                {
+                    configureClient.BaseAddress = new Uri("https://localhost:5001");
+                    configureClient.Timeout = new TimeSpan(0, 0, 30);
+                })
+            .ConfigurePrimaryHttpMessageHandler(() =>
+            {
+                var handler = new SocketsHttpHandler();
+                //handler.AllowAutoRedirect = false;
+                return handler;
+            });
+
+        services.AddHttpClient<MoviesAPIClient>(configureClient =>
+        {
+            //configureClient.BaseAddress = new Uri("https://localhost:5001");
+            //configureClient.Timeout = new TimeSpan(0, 0, 30);
+        });
 
         // For the cancellation samples
         // services.AddScoped<IIntegrationService, CancellationSamples>();
@@ -18,7 +41,7 @@ using IHost host = Host.CreateDefaultBuilder(args)
         // services.AddScoped<IIntegrationService, CompressionSamples>();
 
         // For the CRUD samples
-        services.AddScoped<IIntegrationService, CRUDSamples>();
+        //services.AddScoped<IIntegrationService, CRUDSamples>();
 
         // For the compression samples
         // services.AddScoped<IIntegrationService, CompressionSamples>();
@@ -33,7 +56,7 @@ using IHost host = Host.CreateDefaultBuilder(args)
         // services.AddScoped<IIntegrationService, HttpClientFactorySamples>();
 
         // For the local streams samples
-        // services.AddScoped<IIntegrationService, LocalStreamsSamples>();
+        services.AddScoped<IIntegrationService, LocalStreamsSamples>();
 
         // For the partial update samples
         // services.AddScoped<IIntegrationService, PartialUpdateSamples>();
@@ -62,12 +85,10 @@ catch (Exception generalException)
 {
     // log the exception
     var logger = host.Services.GetRequiredService<ILogger<Program>>();
-    logger.LogError(generalException,
-        "An exception happened while running the integration service.");
+    logger.LogError(generalException, "An exception happened while running the integration service.");
 }
 
 Console.ReadKey();
 
 await host.RunAsync();
- 
- 
+
